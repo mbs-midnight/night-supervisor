@@ -5,7 +5,6 @@ import { wordlist as english } from '@scure/bip39/wordlists/english.js';
 import { Buffer } from 'buffer';
 import {
   ShieldedEncryptionSecretKey,
-  MidnightBech32m,
 } from '@midnight-ntwrk/wallet-sdk-address-format';
 
 // Network ID — change to 'preprod', 'preview', or 'undeployed' as needed

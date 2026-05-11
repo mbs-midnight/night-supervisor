@@ -1,0 +1,33 @@
+{
+  "name": "midnight-supervisor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Reference implementation of a viewing-key-based supervisory dashboard for Midnight shielded assets. Built for regulator engagement and custodian compliance reference.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-react": "^0.439.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@midnight-ntwrk/ledger-v8": "^8.0.3",
+    "@midnight-ntwrk/wallet-sdk-hd": "^3.0.2",
+    "@scure/bip39": "^2.2.0",
+    "@types/node": "^25.6.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vite": "^5.3.4"
+  }
+}

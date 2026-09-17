@@ -31,6 +31,8 @@ const ATOMIC_DECIMALS: Record<string, number> = {
   tUSDM: 6,
   tUSDC: 6,
   tEUR: 6,
+  sTEST: 0,
+  UNKNOWN: 0,
 };
 
 function atomicToDecimal(amount: string, tokenType: string): string {
@@ -61,6 +63,10 @@ export function exportTransactionsAsCsv(
     'counterparty_address',
     'memo',
     'contract_address',
+    'raw_token_type',
+    'received_atomic',
+    'spent_atomic',
+    'fee_specks',
   ];
 
   const sorted = [...transactions].sort(
@@ -72,8 +78,9 @@ export function exportTransactionsAsCsv(
     `# Wallet: ${walletAddress}`,
     `# Export range: ${exportRange.from} to ${exportRange.to}`,
     `# Export generated: ${new Date().toISOString()}`,
-    `# Decimal convention: NIGHT, DUST, tUSDM, tUSDC, tEUR all use 6-decimal atomic units`,
-    `# Source: Midnight Indexer GraphQL API v1, post-viewing-key decryption`,
+    `# Decimal convention: NIGHT, DUST, tUSDM, tUSDC, tEUR use 6-decimal atomic units; sTEST is integer units`,
+    `# Direction: incoming / outgoing are net transfers; self nets to zero for this wallet (received_atomic and spent_atomic give gross legs)`,
+    `# Source: Midnight Indexer GraphQL schema v4 zswapLedgerEvents, replayed through ledger-v9 with the wallet's keys`,
     `# `,
   ].join('\n');
 
@@ -93,6 +100,10 @@ export function exportTransactionsAsCsv(
         csvEscape(tx.counterpartyAddress),
         csvEscape(tx.memo ?? ''),
         csvEscape(tx.contractAddress ?? ''),
+        csvEscape(tx.rawTokenType ?? ''),
+        csvEscape(tx.receivedAtomic ?? ''),
+        csvEscape(tx.spentAtomic ?? ''),
+        csvEscape(tx.fee ?? ''),
       ].join(','),
     ),
   ].join('\n');

@@ -6,9 +6,10 @@ import { SANCTIONS_LOOKUP } from '../data/sanctions-list';
 interface TransactionInspectorProps {
   transaction: Transaction | null;
   onClose: () => void;
+  live?: boolean;
 }
 
-export function TransactionInspector({ transaction, onClose }: TransactionInspectorProps) {
+export function TransactionInspector({ transaction, onClose, live = false }: TransactionInspectorProps) {
   if (!transaction) {
     return (
       <div className="panel p-5 h-full">
@@ -56,21 +57,53 @@ export function TransactionInspector({ transaction, onClose }: TransactionInspec
         <Field label="Direction">
           <span
             className={`font-mono text-sm uppercase tracking-wider ${
-              transaction.direction === 'incoming' ? 'text-signal-ok' : 'text-ink-primary'
+              transaction.direction === 'incoming'
+                ? 'text-signal-ok'
+                : transaction.direction === 'self'
+                  ? 'text-ink-secondary'
+                  : 'text-ink-primary'
             }`}
           >
             {transaction.direction}
           </span>
+          {transaction.direction === 'self' && (
+            <div className="font-mono text-2xs text-ink-tertiary mt-1">
+              spent and received net to zero for this wallet (consolidation / split)
+            </div>
+          )}
         </Field>
 
-        <Field label="Amount">
+        <Field label={transaction.direction === 'self' ? 'Turnover' : 'Amount'}>
           <div className="font-mono text-base text-ink-primary tabular-nums">
             {formatAtomic(transaction.amount, transaction.tokenType, { withSymbol: true })}
           </div>
           <div className="font-mono text-2xs text-ink-tertiary mt-1">
             atomic: {String(transaction.amount)}
+            {transaction.receivedAtomic !== undefined && transaction.spentAtomic !== undefined && (
+              <>
+                <br />
+                received {transaction.receivedAtomic} · spent {transaction.spentAtomic}
+              </>
+            )}
           </div>
         </Field>
+
+        {transaction.rawTokenType && (
+          <Field label="Raw Token Type">
+            <div className="font-mono text-2xs text-ink-tertiary break-all leading-relaxed">
+              {transaction.rawTokenType}
+            </div>
+          </Field>
+        )}
+
+        {transaction.fee && (
+          <Field label="Fee Paid">
+            <div className="font-mono text-2xs text-ink-secondary tabular-nums">
+              {transaction.fee} Specks
+            </div>
+            <div className="font-mono text-2xs text-ink-tertiary mt-1">1 DUST = 10^15 Specks</div>
+          </Field>
+        )}
 
         <Field label="Apply Stage">
           <span
@@ -114,7 +147,22 @@ export function TransactionInspector({ transaction, onClose }: TransactionInspec
           <div className="font-mono text-2xs text-ink-secondary break-all leading-relaxed">
             {transaction.counterpartyAddress}
           </div>
+          {transaction.counterpartyAddress.startsWith('undisclosed') && (
+            <div className="font-mono text-2xs text-ink-tertiary mt-1 leading-relaxed">
+              A viewing key decrypts what this wallet received and recognizes what it
+              spent; it does not reveal the other party. Attribution requires memo,
+              contract context, or off-chain Travel Rule pairing.
+            </div>
+          )}
         </Field>
+
+        {transaction.contractAddress && (
+          <Field label="Contract Address">
+            <div className="font-mono text-2xs text-ink-tertiary break-all leading-relaxed">
+              {transaction.contractAddress}
+            </div>
+          </Field>
+        )}
 
         {transaction.memo && (
           <Field label="Memo">
@@ -125,11 +173,19 @@ export function TransactionInspector({ transaction, onClose }: TransactionInspec
         <div className="border-t border-rule-subtle pt-4">
           <div className="label-micro mb-2">Decryption Source</div>
           <div className="font-mono text-2xs text-ink-tertiary leading-relaxed">
-            Decrypted via JubJub ECDH against viewing key.
-            <br />
-            Pre-decryption ciphertext is not human-readable; this view shows the
-            payload after the indexer's wallet-relevant subscription decrypts
-            successfully.
+            {live ? (
+              <>
+                Serialized zswap ledger events streamed from the indexer and replayed
+                through ledger-v9 ZswapLocalState.replayEventsWithChanges with this
+                wallet's keys. Output ciphertexts are decrypted with the encryption
+                secret key; spends are matched by nullifier.
+              </>
+            ) : (
+              <>
+                Synthetic record shaped like a ledger-v9 replay result. In live mode this
+                view shows real decrypted coin movements.
+              </>
+            )}
           </div>
         </div>
       </div>

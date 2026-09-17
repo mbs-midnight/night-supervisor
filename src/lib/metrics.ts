@@ -1,6 +1,7 @@
 import type { Transaction, TokenType, BalanceSnapshot } from '../types';
+import { atomicToNumber } from './format';
 
-const ALL_TOKENS: TokenType[] = ['NIGHT', 'DUST', 'tUSDM', 'tUSDC', 'tEUR'];
+export const ALL_TOKENS: TokenType[] = ['NIGHT', 'DUST', 'tUSDM', 'tUSDC', 'tEUR', 'sTEST', 'UNKNOWN'];
 
 function emptyBalance(): Record<TokenType, bigint> {
   return ALL_TOKENS.reduce((acc, t) => ({ ...acc, [t]: 0n }), {} as Record<TokenType, bigint>);
@@ -22,9 +23,10 @@ export function deriveBalanceTimeline(transactions: Transaction[]): BalanceSnaps
     const amount = BigInt(tx.amount);
     if (tx.direction === 'incoming') {
       balance[tx.tokenType] += amount;
-    } else {
+    } else if (tx.direction === 'outgoing') {
       balance[tx.tokenType] -= amount;
     }
+    // 'self' nets to zero for this wallet
     snapshots.push({
       timestamp: tx.timestamp,
       balanceByToken: ALL_TOKENS.reduce(
@@ -51,7 +53,35 @@ const USD_RATES: Record<TokenType, number> = {
   tUSDM: 1.00,
   tUSDC: 1.00,
   tEUR: 1.08,
+  sTEST: 0,       // test token, no reference rate
+  UNKNOWN: 0,
 };
+
+/** Token with the largest current balance, for the summary card. */
+export function primaryToken(balances: Record<TokenType, bigint>): TokenType {
+  let best: TokenType = 'tUSDM';
+  let bestValue = -1n;
+  for (const t of ALL_TOKENS) {
+    if (balances[t] > bestValue) {
+      best = t;
+      bestValue = balances[t];
+    }
+  }
+  return bestValue > 0n ? best : 'tUSDM';
+}
+
+/** Tokens with any successful activity, most active first. */
+export function activeTokens(transactions: Transaction[], limit = 3): TokenType[] {
+  const counts = new Map<TokenType, number>();
+  for (const tx of transactions) {
+    if (tx.applyStage !== 'Success') continue;
+    counts.set(tx.tokenType, (counts.get(tx.tokenType) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([t]) => t);
+}
 
 export function getCurrentBalances(transactions: Transaction[]): CurrentBalances {
   const balance = emptyBalance();
@@ -59,14 +89,12 @@ export function getCurrentBalances(transactions: Transaction[]): CurrentBalances
     if (tx.applyStage !== 'Success') continue;
     const amount = BigInt(tx.amount);
     if (tx.direction === 'incoming') balance[tx.tokenType] += amount;
-    else balance[tx.tokenType] -= amount;
+    else if (tx.direction === 'outgoing') balance[tx.tokenType] -= amount;
   }
 
   let totalUsd = 0;
   for (const t of ALL_TOKENS) {
-    // Convert atomic to decimal (assume 6 decimals for all)
-    const decimal = Number(balance[t]) / 1_000_000;
-    totalUsd += decimal * USD_RATES[t];
+    totalUsd += atomicToNumber(balance[t], t) * USD_RATES[t];
   }
 
   return { byToken: balance, totalUsdEquivalent: totalUsd };
@@ -92,7 +120,7 @@ export function aggregateByCounterparty(
   for (const tx of transactions) {
     if (tx.applyStage !== 'Success') continue;
     const existing = map.get(tx.counterpartyAddress);
-    const usdValue = (Number(BigInt(tx.amount)) / 1_000_000) * (USD_RATES[tx.tokenType] ?? 0);
+    const usdValue = atomicToNumber(tx.amount, tx.tokenType) * (USD_RATES[tx.tokenType] ?? 0);
 
     if (!existing) {
       map.set(tx.counterpartyAddress, {

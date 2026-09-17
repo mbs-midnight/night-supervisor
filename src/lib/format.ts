@@ -6,6 +6,8 @@ const ATOMIC_DECIMALS: Record<TokenType, number> = {
   tUSDM: 6,
   tUSDC: 6,
   tEUR: 6,
+  sTEST: 0,
+  UNKNOWN: 0,
 };
 
 const TOKEN_SYMBOLS: Record<TokenType, string> = {
@@ -14,19 +16,31 @@ const TOKEN_SYMBOLS: Record<TokenType, string> = {
   tUSDM: 'tUSDM',
   tUSDC: 'tUSDC',
   tEUR: 'tEUR',
+  sTEST: 'sTEST',
+  UNKNOWN: '?',
 };
+
+export function tokenDecimals(tokenType: TokenType): number {
+  return ATOMIC_DECIMALS[tokenType] ?? 0;
+}
+
+/** Atomic units to a JS number in whole tokens (for charts, not money math). */
+export function atomicToNumber(amount: string | bigint, tokenType: TokenType): number {
+  const amt = typeof amount === 'string' ? BigInt(amount) : amount;
+  return Number(amt) / 10 ** tokenDecimals(tokenType);
+}
 
 export function formatAtomic(
   amount: string | bigint,
   tokenType: TokenType,
   opts: { withSymbol?: boolean; precision?: number } = {},
 ): string {
-  const decimals = ATOMIC_DECIMALS[tokenType];
+  const decimals = tokenDecimals(tokenType);
   const amt = typeof amount === 'string' ? BigInt(amount) : amount;
   const divisor = 10n ** BigInt(decimals);
   const whole = amt / divisor;
   const frac = amt % divisor;
-  const precision = opts.precision ?? 2;
+  const precision = Math.min(opts.precision ?? 2, decimals);
   const fracStr = frac
     .toString()
     .padStart(decimals, '0')

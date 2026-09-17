@@ -1,23 +1,18 @@
 /**
- * IndexerClient interface — the swap boundary between mock and production.
+ * IndexerClient interface — the swap boundary between mock and live data.
  *
- * In this reference implementation, MockIndexerClient implements this interface
- * and produces synthetic transaction streams. To run against a live Midnight
- * Indexer:
+ * Two implementations exist:
  *
- *   1. Implement a GraphqlIndexerClient that satisfies this interface.
- *   2. The implementation calls the `connect(viewingKey)` mutation to obtain a
- *      sessionId, then opens a WebSocket subscription to
- *      `wallet(sessionId, index)` per the GraphQL schema-v1.graphql contract.
- *   3. Forward every `ViewingUpdate` and `ProgressUpdate` event to the
- *      registered callback.
- *   4. Replace the `new MockIndexerClient(...)` instantiation in App.tsx with
- *      `new GraphqlIndexerClient(...)`.
+ *   - MockIndexerClient (src/data/mock-indexer-client.ts): deterministic
+ *     synthetic stream. Chosen from the entry screen ("Run synthetic demo").
+ *   - GraphqlIndexerClient (src/data/GraphqlIndexerClient.ts): live client for
+ *     an indexer serving GraphQL schema v4 (Stagenet). Registers the viewing
+ *     key with the `connect` mutation, replays `zswapLedgerEvents` through
+ *     ledger-v9 to decrypt the wallet's coin movements, and enriches each hit
+ *     with block metadata from `transactions(offset: {hash})`.
  *
- * No other code in this codebase changes. The detection rules, screening,
- * export, and UI all consume the IndexerClient interface only.
- *
- * See README.md for a worked example of the production swap.
+ * Both emit the same `ViewingUpdate` / `ProgressUpdate` envelopes. The
+ * detection rules, screening, export, and UI consume only this interface.
  */
 
 import type { WalletEvent, WalletSession } from '../types';
@@ -28,16 +23,16 @@ export type SessionStateHandler = (session: WalletSession) => void;
 export interface IndexerClient {
   /**
    * Establish a session by registering a viewing key with the indexer.
-   * In production this calls the `connect(viewingKey: ViewingKey!)` GraphQL
-   * mutation. Returns the session metadata.
+   * The live client calls the `connect(viewingKey: ViewingKey!)` GraphQL
+   * mutation and opens the WebSocket subscriptions. Returns the session metadata.
    */
   connect(viewingKey: string, walletAddress: string): Promise<WalletSession>;
 
   /**
    * Subscribe to wallet events. Calls the handler for every ViewingUpdate
    * (containing relevant transactions) and ProgressUpdate (sync progress).
-   * In production this opens a `wallet(sessionId, index)` GraphQL subscription
-   * over WebSocket.
+   * The live client drives these from the `zswapLedgerEvents` and
+   * `shieldedTransactions` GraphQL subscriptions.
    */
   subscribe(handler: WalletEventHandler): () => void;
 
@@ -47,7 +42,7 @@ export interface IndexerClient {
   onSessionUpdate(handler: SessionStateHandler): () => void;
 
   /**
-   * End the session. In production this calls the
+   * End the session. The live client closes the socket and calls the
    * `disconnect(sessionId: HexEncoded!)` GraphQL mutation.
    */
   disconnect(): Promise<void>;

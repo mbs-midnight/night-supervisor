@@ -22,7 +22,8 @@ export function screenTransactionForSanctions(
   const hit = SANCTIONS_LOOKUP.get(tx.counterpartyAddress);
   if (!hit) return null;
 
-  const directionWord = tx.direction === 'incoming' ? 'received from' : 'sent to';
+  const directionWord =
+    tx.direction === 'incoming' ? 'received from' : tx.direction === 'outgoing' ? 'sent to' : 'moved within';
 
   return {
     id: `sanctions-${tx.hash}`,

@@ -47,13 +47,22 @@ function reducer(state: State, action: Action): State {
       return { ...state, session: action.session };
     case 'WALLET_EVENT':
       return { ...state, lastEventAt: new Date().toISOString() };
-    case 'TRANSACTION_INGESTED':
-      // Insert in chronological order (newest first for display)
+    case 'TRANSACTION_INGESTED': {
+      // One row per (transaction, token). A redelivered or updated row
+      // replaces its predecessor so reconnects never duplicate entries.
+      const key = (t: Transaction) => `${t.hash}:${t.tokenType}`;
+      const k = key(action.tx);
+      const idx = state.transactions.findIndex((t) => key(t) === k);
+      const transactions =
+        idx === -1
+          ? [action.tx, ...state.transactions]
+          : state.transactions.map((t, i) => (i === idx ? action.tx : t));
       return {
         ...state,
-        transactions: [action.tx, ...state.transactions],
+        transactions,
         lastEventAt: new Date().toISOString(),
       };
+    }
     case 'ALERT_TRIGGERED': {
       // Dedupe by alert ID
       if (state.alerts.some((a) => a.id === action.alert.id)) return state;

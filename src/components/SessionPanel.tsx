@@ -5,6 +5,8 @@ import { formatRelativeTime } from '../lib/format';
 interface SessionPanelProps {
   session: WalletSession | null;
   lastEventAt: string | null;
+  connectionLabel: string;
+  live: boolean;
 }
 
 const STATUS_DISPLAY: Record<
@@ -18,7 +20,7 @@ const STATUS_DISPLAY: Record<
   error: { label: 'Error', tone: 'text-signal-critical', Icon: WifiOff },
 };
 
-export function SessionPanel({ session, lastEventAt }: SessionPanelProps) {
+export function SessionPanel({ session, lastEventAt, connectionLabel, live }: SessionPanelProps) {
   if (!session) {
     return (
       <div className="panel p-5">
@@ -79,18 +81,52 @@ export function SessionPanel({ session, lastEventAt }: SessionPanelProps) {
       <div className="border-t border-rule-subtle pt-4 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="label-micro mb-1">Chain Tip</div>
+            <div className="label-micro mb-1">{live ? 'Chain Tip (event id)' : 'Chain Tip'}</div>
             <div className="font-mono text-xs text-ink-primary tabular-nums">
               {session.highestIndex.toLocaleString()}
             </div>
           </div>
           <div>
-            <div className="label-micro mb-1">Wallet Tip</div>
+            <div className="label-micro mb-1">{live ? 'Last Wallet Event' : 'Wallet Tip'}</div>
             <div className="font-mono text-xs text-ink-primary tabular-nums">
               {session.highestRelevantWalletIndex.toLocaleString()}
             </div>
           </div>
         </div>
+
+        {live && session.eventsReplayed !== undefined && (
+          <div>
+            <div className="label-micro mb-1">Ledger Events Replayed</div>
+            <div className="font-mono text-xs text-ink-secondary tabular-nums">
+              {session.eventsReplayed.toLocaleString()}
+            </div>
+          </div>
+        )}
+
+        {live && (
+          <div>
+            <div className="label-micro mb-1">Indexer Viewing-Key Scan</div>
+            {session.indexerScan ? (
+              <div className="font-mono text-2xs text-ink-secondary tabular-nums leading-relaxed">
+                checked {session.indexerScan.checkedEndIndex.toLocaleString()} /{' '}
+                {session.indexerScan.chainEndIndex.toLocaleString()} commitments
+                <br />
+                last relevant at {session.indexerScan.relevantEndIndex.toLocaleString()}
+              </div>
+            ) : (
+              <div className="font-mono text-2xs text-ink-tertiary">awaiting progress…</div>
+            )}
+          </div>
+        )}
+
+        {session.lastError && (
+          <div>
+            <div className="label-micro mb-1">Last Error</div>
+            <div className="font-mono text-2xs text-signal-warning break-all leading-relaxed">
+              {session.lastError}
+            </div>
+          </div>
+        )}
 
         {lastEventAt && (
           <div>
@@ -105,10 +141,8 @@ export function SessionPanel({ session, lastEventAt }: SessionPanelProps) {
 
       <div className="border-t border-rule-subtle pt-4 space-y-2">
         <div className="label-micro">Connection</div>
-        <div className="font-mono text-2xs text-ink-tertiary leading-relaxed">
-          MockIndexerClient
-          <br />
-          (production: indexer-rs.testnet-02.midnight.network)
+        <div className="font-mono text-2xs text-ink-tertiary leading-relaxed break-all">
+          {connectionLabel}
         </div>
       </div>
     </div>

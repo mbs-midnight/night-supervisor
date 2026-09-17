@@ -8,43 +8,50 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import type { Transaction } from '../types';
-import { deriveBalanceTimeline } from '../lib/metrics';
+import type { Transaction, TokenType } from '../types';
+import { activeTokens, deriveBalanceTimeline } from '../lib/metrics';
+import { atomicToNumber } from '../lib/format';
 
 interface BalanceTimelineProps {
   transactions: Transaction[];
 }
 
-const TOKENS_TO_PLOT = ['tUSDM', 'tUSDC', 'tEUR'] as const;
+const DEFAULT_TOKENS: TokenType[] = ['tUSDM', 'tUSDC', 'tEUR'];
 
-const TOKEN_COLORS: Record<(typeof TOKENS_TO_PLOT)[number], string> = {
+const TOKEN_COLORS: Record<TokenType, string> = {
   tUSDM: '#319795',
   tUSDC: '#3182CE',
   tEUR: '#9F7AEA',
+  NIGHT: '#D69E2E',
+  DUST: '#718096',
+  sTEST: '#ED8936',
+  UNKNOWN: '#A0AEC0',
 };
 
-interface ChartDatum {
-  ts: number;
-  label: string;
-  tUSDM: number;
-  tUSDC: number;
-  tEUR: number;
-}
+type ChartDatum = { ts: number; label: string } & Partial<Record<TokenType, number>>;
 
 export function BalanceTimeline({ transactions }: BalanceTimelineProps) {
+  // Plot the tokens that actually move; fall back to the stablecoin trio for
+  // an empty stream so the legend is not blank while syncing.
+  const TOKENS_TO_PLOT = useMemo<TokenType[]>(() => {
+    const active = activeTokens(transactions, 3);
+    return active.length > 0 ? active : DEFAULT_TOKENS;
+  }, [transactions]);
+
   const data = useMemo<ChartDatum[]>(() => {
     const snapshots = deriveBalanceTimeline(transactions);
     return snapshots.map((s) => {
       const ts = new Date(s.timestamp).getTime();
-      return {
+      const datum: ChartDatum = {
         ts,
         label: new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        tUSDM: Number(BigInt(s.balanceByToken.tUSDM)) / 1_000_000,
-        tUSDC: Number(BigInt(s.balanceByToken.tUSDC)) / 1_000_000,
-        tEUR: Number(BigInt(s.balanceByToken.tEUR)) / 1_000_000,
       };
+      for (const t of TOKENS_TO_PLOT) {
+        datum[t] = atomicToNumber(s.balanceByToken[t], t);
+      }
+      return datum;
     });
-  }, [transactions]);
+  }, [transactions, TOKENS_TO_PLOT]);
 
   return (
     <div className="panel p-5">
@@ -52,7 +59,7 @@ export function BalanceTimeline({ transactions }: BalanceTimelineProps) {
         <div>
           <div className="label-micro">Balance Evolution</div>
           <div className="font-mono text-sm text-ink-secondary mt-1">
-            Stablecoin holdings over time, post viewing-key decryption
+            Decrypted holdings over time, per token
           </div>
         </div>
         <div className="flex gap-4">
